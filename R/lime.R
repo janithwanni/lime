@@ -46,6 +46,8 @@ model_permutations <- function(x, y, weights, labels, n_labels, n_features, feat
     if (length(features) == 1) {
       x_fit = cbind("(Intercept)" = rep(1, nrow(x)), x[, features, drop = FALSE])
       fit <- glm.fit(x = x_fit, y = y[[label]],  weights = weights, family = gaussian())
+      model_input_data <- cbind(x_fit, y[[label]])
+      model_input_weights <- weights
       r2 <- 1 - fit$deviance / fit$null.deviance
       coefs <- coef(fit)
       intercept <- coefs[1]
@@ -54,21 +56,23 @@ model_permutations <- function(x, y, weights, labels, n_labels, n_features, feat
     } else {
       shuffle_order <- sample(length(y[[label]])) # glm is sensitive to the order of the examples
       fit <- glmnet(x[shuffle_order, features], y[[label]][shuffle_order], weights = weights[shuffle_order], alpha = 0, lambda = 2 / length(y[[label]]), standardize = FALSE)
+      model_input_data <- cbind(x[shuffle_order, features], y[[label]][shuffle_order])
+      model_input_weights <- weights[shuffle_order]
       r2 <- fit$dev.ratio
       coefs <- coef(fit)
       intercept <- coefs[1, 1]
       coefs <- coefs[-1, 1]
       model_pred <- predict(fit, x[1, features, drop = FALSE])[1]
     }
-
-    data.frame(
+    tibble::tibble(
       label = label,
       feature = names(coefs),
       feature_weight = unname(coefs),
       model_r2 = r2,
       model_intercept = intercept,
       model_prediction = model_pred,
-      stringsAsFactors = FALSE
+      model_input_data = list(model_input_data),
+      model_input_weights = list(model_input_weights) 
     )
   })
   do.call(rbind, res)
